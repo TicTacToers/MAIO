@@ -1,6 +1,6 @@
 import json
 
-from ml.config import MODEL_VERSION
+from ml.config import CV_FOLDS, MODEL_VERSION
 from ml.train import train
 
 
@@ -15,6 +15,15 @@ def test_training_writes_artifacts(artifacts):
 def test_rmse_is_sane(artifacts):
     _, metrics = artifacts
     assert 0 < metrics["rmse"] < 70
+
+
+def test_metrics_include_cv_and_hyperparams(artifacts):
+    _, metrics = artifacts
+    assert metrics["cv_folds"] == CV_FOLDS
+    assert 0 < metrics["cv_rmse_mean"] < 70
+    assert metrics["cv_rmse_std"] >= 0
+    assert metrics["hyperparams"]["model__fit_intercept"] is True
+    assert all("__" in k for k in metrics["hyperparams"])
 
 
 def test_training_is_deterministic(artifacts, tmp_path):

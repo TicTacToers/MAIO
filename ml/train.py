@@ -12,11 +12,11 @@ import sklearn
 from sklearn.datasets import load_diabetes
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import KFold, cross_val_score, train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-from ml.config import FEATURES, MODEL_VERSION, RANDOM_STATE, TEST_SIZE
+from ml.config import CV_FOLDS, FEATURES, MODEL_VERSION, RANDOM_STATE, TEST_SIZE
 
 
 def build_pipeline() -> Pipeline:
@@ -26,6 +26,19 @@ def build_pipeline() -> Pipeline:
             ("model", LinearRegression()),
         ]
     )
+
+
+def hyperparams(pipeline: Pipeline) -> dict:
+    return {
+        k: v if isinstance(v, bool | int | float | str | None) else repr(v)
+        for k, v in pipeline.get_params().items()
+        if "__" in k
+    }
+
+
+def cv_rmse(X: np.ndarray, y: np.ndarray) -> np.ndarray:
+    cv = KFold(n_splits=CV_FOLDS, shuffle=True, random_state=RANDOM_STATE)
+    return -cross_val_score(build_pipeline(), X, y, cv=cv, scoring="neg_root_mean_squared_error")
 
 
 def load_data() -> tuple[np.ndarray, np.ndarray]:
@@ -41,6 +54,7 @@ def train(out_dir: Path) -> dict:
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=TEST_SIZE, random_state=RANDOM_STATE
     )
+    cv_scores = cv_rmse(X_train, y_train)
 
     pipeline = build_pipeline()
     t0 = time.perf_counter()
@@ -54,6 +68,9 @@ def train(out_dir: Path) -> dict:
         "model_version": MODEL_VERSION,
         "model": type(pipeline.named_steps["model"]).__name__,
         "rmse": round(rmse, 4),
+        "cv_rmse_mean": round(float(cv_scores.mean()), 4),
+        "cv_rmse_std": round(float(cv_scores.std()), 4),
+        "cv_folds": CV_FOLDS,
         "n_train": int(len(X_train)),
         "n_test": int(len(X_test)),
         "test_size": TEST_SIZE,
@@ -61,6 +78,7 @@ def train(out_dir: Path) -> dict:
         "train_seconds": round(train_seconds, 4),
         "sklearn_version": sklearn.__version__,
         "python_version": platform.python_version(),
+        "hyperparams": hyperparams(pipeline),
     }
 
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -81,10 +99,11 @@ def log_to_mlflow(metrics: dict, out_dir: Path) -> bool:
 
     mlflow.set_experiment("diabetes-progression")
     with mlflow.start_run(run_name=metrics["model_version"]):
-        mlflow.log_params(
-            {k: metrics[k] for k in ("model_version", "model", "test_size", "random_state")}
+        run_params = ("model_version", "model", "test_size", "random_state", "cv_folds")
+        mlflow.log_params({k: metrics[k] for k in run_params} | metrics["hyperparams"])
+        mlflow.log_metrics(
+            {k: metrics[k] for k in ("rmse", "cv_rmse_mean", "cv_rmse_std", "train_seconds")}
         )
-        mlflow.log_metrics({"rmse": metrics["rmse"], "train_seconds": metrics["train_seconds"]})
         mlflow.log_artifact(str(out_dir / "metrics.json"))
         mlflow.log_artifact(str(out_dir / "model.joblib"))
     return True
