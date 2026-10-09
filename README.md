@@ -17,7 +17,7 @@ Xy = load_diabetes(as_frame=True)
 
 X = Xy.frame.drop(columns=["target"])
 
-y = Xy.frame["target"] # acts as a "progression index" (higher = worse)
+y = Xy.frame["target"]  # acts as a "progression index" (higher = worse)
 ```
 > Treat `y` as a progression index: higher values ≈ greater deterioration risk (e.g., rising HbA1c/complications risk). In production, a clinic would train on real outcomes; here, we map the same mechanics to a safe, open dataset.
 
