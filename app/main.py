@@ -32,8 +32,12 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="Diabetes Progression Triage", lifespan=lifespan)
 
 
+# Features are on the dataset's standardized scale (all within ±0.2). The bound rejects
+# raw clinical values (e.g. age=45), which would otherwise yield a nonsense prediction.
+FEATURE_BOUND = 0.5
+
 # allow_inf_nan=False rejects NaN/Infinity, which would otherwise yield a NaN prediction.
-_Feature = Field(..., allow_inf_nan=False)
+_Feature = Field(..., allow_inf_nan=False, ge=-FEATURE_BOUND, le=FEATURE_BOUND)
 
 
 class PatientFeatures(BaseModel):
@@ -70,11 +74,18 @@ class Prediction(BaseModel):
     prediction: float
 
 
+def _error_field(err: dict) -> str:
+    # For JSON parse errors the loc is ("body", <char offset>), not a field name.
+    if err["type"] == "json_invalid":
+        return "body"
+    return ".".join(str(p) for p in err["loc"] if p != "body") or "body"
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_error_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
     errors = [
         {
-            "field": ".".join(str(p) for p in err["loc"] if p != "body") or "body",
+            "field": _error_field(err),
             "message": err["msg"],
             "type": err["type"],
         }
