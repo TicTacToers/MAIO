@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+artifacts/
+mlruns/
+mlflow.db
+.DS_Store
+.idea/
+.vscode/
