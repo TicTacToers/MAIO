@@ -16,7 +16,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.13.7"
           cache: pip
           cache-dependency-path: requirements*.txt
 
@@ -57,6 +57,10 @@ jobs:
         run: |
           for i in $(seq 1 20); do curl -sf http://localhost:80/health && break; sleep 1; done
           curl -sf http://localhost:80/health | grep -q '"status":"ok"'
+          expected=$(python3 -c 'from ml.config import MODEL_VERSION; print(MODEL_VERSION)')
+          actual=$(curl -sf http://localhost:80/health | jq -r .model_version)
+          echo "model_version: expected=$expected actual=$actual"
+          test "$actual" = "$expected"
           curl -sf -X POST http://localhost:80/predict -H "Content-Type: application/json" \
             -d '{"age":0.02,"sex":-0.044,"bmi":0.06,"bp":-0.03,"s1":-0.02,"s2":0.03,"s3":-0.02,"s4":0.02,"s5":0.02,"s6":-0.001}' \
             | grep -q '"prediction"'

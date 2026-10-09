@@ -62,7 +62,7 @@ Invalid input (missing field, wrong type, malformed JSON) returns **HTTP 422**:
 
 ## Develop locally
 
-Requires Python 3.13.
+Requires Python 3.13.7 (same as CI and the Docker base image).
 
 ```bash
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
