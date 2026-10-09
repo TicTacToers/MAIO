@@ -36,7 +36,9 @@ curl -X POST http://localhost:80/predict \
 ```
 
 All 10 features are **required** floats, in the standardized scale of the
-scikit-learn dataset. Extra fields are ignored. `NaN`/`Infinity` are rejected.
+scikit-learn dataset (all dataset values lie within ±0.2). Values outside **[-0.5, 0.5]**
+are rejected, so raw clinical values (e.g. `"age": 45`) get a 422 instead of a
+nonsense score. Extra fields are ignored. `NaN`/`Infinity` are rejected.
 
 ## Error responses
 
