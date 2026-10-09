@@ -33,8 +33,8 @@ Create `.github/workflows/release.yml`, triggered on `push: tags: ['v*']`. It ne
    `docker logout ghcr.io && docker pull ghcr.io/<ns>/<repo>:v0.1 && docker run -p 80:80 ...` and run the three curls from the brief.
 
 ## Step 3: v0.2 experiment (`feat/v0.2-model`, owner: ___)
-1. Compare candidates on **the same split**: Ridge (tune alpha with `RidgeCV`), Lasso, RandomForest, GradientBoosting. Log each to MLflow. Our MLflow use rests on this comparison, so screenshot the comparison view.
-2. Expect only small RMSE gains. Linear models usually win on this dataset, and RandomForest is often *worse*. Pick the honest winner, even if the gain is small.
+1. Compare candidates on **`cv_rmse_mean`**, the 5-fold cross-validated RMSE on the training split that `ml.train` already computes: Ridge (tune alpha with `RidgeCV`), Lasso, RandomForest, GradientBoosting. Log each to MLflow; hyperparameters are logged automatically from `get_params()`. Our MLflow use rests on this comparison, so screenshot the comparison view.
+2. **Do not pick the winner by test `rmse`.** With n_test = 89, choosing on the test set leaks it into model selection and overstates the result. Pick on `cv_rmse_mean` (look at `cv_rmse_std` too: a gap smaller than the std is noise), then report the test `rmse` of the chosen model once. Expect only small gains. Linear models usually win on this dataset, and RandomForest is often *worse*. Pick the honest winner, even if the gain is small.
 3. Optional but strong: add a "high-risk" flag (for example, predicted progression ≥ the 75th percentile of y_train) and report precision/recall. Keep the `/predict` response **exactly** `{"prediction": float}`. If you want the flag in the API, use a separate field only after checking it doesn't break the grader. The safer option is to report it only in CHANGELOG/metrics.json.
 4. Change `build_pipeline()` in `ml/train.py`, set `MODEL_VERSION = "v0.2"`, and fill in the v0.2 section of CHANGELOG.md with side-by-side metrics and a rationale.
 
