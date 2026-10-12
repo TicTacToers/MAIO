@@ -1,7 +1,5 @@
 # Diabetes Progression Triage — ML Service
 
-> AI Generated file, to help you get started. Only for demonstration purposes.
-
 A small FastAPI service that predicts short-term diabetes **progression** (a continuous
 risk score, higher = worse) so a virtual clinic can sort patients for follow-up.
 It is trained on scikit-learn's diabetes regression dataset and shipped as a
