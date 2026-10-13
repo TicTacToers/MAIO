@@ -1,6 +1,6 @@
 import json
 
-from ml.config import CV_FOLDS, MODEL_VERSION
+from ml.config import CV_FOLDS, HIGH_RISK_PERCENTILE, MODEL_VERSION
 from ml.train import train
 
 
@@ -30,3 +30,11 @@ def test_training_is_deterministic(artifacts, tmp_path):
     _, first = artifacts
     second = train(tmp_path)
     assert first["rmse"] == second["rmse"]
+
+
+def test_high_risk_metrics_valid(artifacts):
+    _, metrics = artifacts
+    assert metrics["high_risk_percentile"] == HIGH_RISK_PERCENTILE
+    assert metrics["high_risk_threshold"] > 0
+    assert 0 <= metrics["high_risk_precision"] <= 1
+    assert 0 <= metrics["high_risk_recall"] <= 1
