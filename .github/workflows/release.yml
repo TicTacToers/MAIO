@@ -1,0 +1,147 @@
+name: Release
+
+# Runs when a version tag (v0.1, v0.2, ...) is pushed: checks, builds, tests,
+# publishes the image to GHCR and creates a GitHub Release.
+# "Run workflow" in the Actions tab starts a dry run: same checks and build,
+# but nothing is published.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write # create the GitHub Release
+  packages: write # push the image to GHCR
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13.7"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Work out version and image name
+        run: |
+          MODEL_VERSION=$(python -c 'from ml.config import MODEL_VERSION; print(MODEL_VERSION)')
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            VERSION="$GITHUB_REF_NAME"   # the tag, e.g. v0.1
+          else
+            VERSION="$MODEL_VERSION"     # dry run: use the version in the code
+          fi
+          # GHCR names must be lowercase: TicTacToers/MAIO -> tictactoers/maio
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}"
+          echo "MODEL_VERSION=$MODEL_VERSION" >> "$GITHUB_ENV"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+          echo "Releasing $IMAGE:$VERSION (event: $GITHUB_EVENT_NAME)"
+
+      - name: Check tag matches MODEL_VERSION
+        run: |
+          if [ "$VERSION" != "$MODEL_VERSION" ]; then
+            echo "Tag $VERSION does not match MODEL_VERSION=$MODEL_VERSION in ml/config.py"
+            exit 1
+          fi
+
+      - name: Check CHANGELOG.md has a section for this version
+        run: |
+          # Copy the "## [vX.Y]" section up to the next section.
+          # Drafts inside <!-- ... --> comments are ignored, so an unfinished
+          # section cannot pass this check.
+          awk -v v="## [$VERSION]" '
+            /^<!--/ { if (found) exit; incomment = 1; next }
+            /^-->/  { incomment = 0; next }
+            incomment { next }
+            index($0, v) == 1 { found = 1; print; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "CHANGELOG.md has no section '## [$VERSION]'"
+            exit 1
+          fi
+          cat release-notes.md
+
+      - name: Lint
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Unit tests
+        run: pytest -q
+
+      - name: Build image
+        run: |
+          docker build \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.version=$VERSION" \
+            -t "$IMAGE:$VERSION" .
+          docker image ls "$IMAGE:$VERSION" --format 'Image size: {{.Size}}'
+
+      - name: Container smoke test
+        run: |
+          docker run -d --name app -p 80:80 "$IMAGE:$VERSION"
+          bash scripts/smoke.sh "$VERSION"
+
+      - name: Take metrics.json out of the built image
+        run: |
+          # The metrics belong to the exact model inside the image we ship.
+          mkdir -p release-assets
+          docker cp app:/app/artifacts/metrics.json release-assets/metrics.json
+          cat release-assets/metrics.json
+          {
+            echo ""
+            echo "### Metrics of the shipped model"
+            echo '```json'
+            cat release-assets/metrics.json
+            echo '```'
+            echo ""
+            echo "### Run it"
+            echo '```bash'
+            echo "docker pull $IMAGE:$VERSION"
+            echo "docker run -it -p 80:80 $IMAGE:$VERSION"
+            echo '```'
+          } >> release-notes.md
+
+      - name: Upload release files (also kept for dry runs)
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ env.VERSION }}
+          path: |
+            release-notes.md
+            release-assets/
+
+      - name: Container logs on failure
+        if: failure()
+        run: docker logs app || true
+
+      # ---- Everything below only runs for a real tag, not for a dry run ----
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push image to GHCR
+        if: github.event_name == 'push'
+        run: docker push "$IMAGE:$VERSION"
+
+      - name: Create GitHub Release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$VERSION" \
+            --title "$VERSION" \
+            --notes-file release-notes.md \
+            release-assets/metrics.json
