@@ -44,3 +44,26 @@ Baseline: simple StandardScaler + LinearRegression. Report RMSE on a held-out sp
 
 ### Iteration 2 (v0.2)
 Improvement: try Ridge/RandomForestRegressor or better preprocessing (feature scaling/selection), plus calibration of the score if you convert to a “high-risk” flag (e.g., threshold on predicted progression). Show metric deltas (RMSE; if you add a flag, also precision/recall at a threshold) in CHANGELOG.md.
+
+## Measuring image size and speed
+
+The script `scripts/measure.sh` measures two things:
+
+- how big the Docker image is (in MB)
+- how fast `/predict` answers (in milliseconds)
+
+We use these numbers to compare v0.1 and v0.2 in `CHANGELOG.md`.
+
+```bash
+# Measure the current code
+bash scripts/measure.sh
+
+# Measure a published version
+bash scripts/measure.sh ghcr.io/tictactoers/maio:v0.1
+```
+
+The script starts the container, sends 20 practice requests, and then times 200 identical requests. It prints the typical response time (median) and the slow end (95th percentile). At the end it prints two lines you can copy into the CHANGELOG table.
+
+It uses port 8000, so it can run while another container uses port 80.
+Results depend on the machine. Keep in mind for comparability.
+You need Docker, `curl` and `bash` (Mac or Linux).
