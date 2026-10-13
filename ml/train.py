@@ -120,7 +120,17 @@ def log_to_mlflow(metrics: dict, out_dir: Path) -> bool:
         run_params = ("model_version", "model", "test_size", "random_state", "cv_folds")
         mlflow.log_params({k: metrics[k] for k in run_params} | metrics["hyperparams"])
         mlflow.log_metrics(
-            {k: metrics[k] for k in ("rmse", "cv_rmse_mean", "cv_rmse_std", "train_seconds")}
+            {
+                k: metrics[k]
+                for k in (
+                    "rmse",
+                    "cv_rmse_mean",
+                    "cv_rmse_std",
+                    "high_risk_precision",
+                    "high_risk_recall",
+                    "train_seconds",
+                )
+            }
         )
         mlflow.log_artifact(str(out_dir / "metrics.json"))
         mlflow.log_artifact(str(out_dir / "model.joblib"))
