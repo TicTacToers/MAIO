@@ -32,9 +32,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="Diabetes Progression Triage", lifespan=lifespan)
 
 
-# Features are on the dataset's standardized scale (all within ±0.2). The bound rejects
-# raw clinical values (e.g. age=45), which would otherwise yield a nonsense prediction.
-FEATURE_BOUND = 0.5
+FEATURE_BOUND = 1.0
 
 # allow_inf_nan=False rejects NaN/Infinity, which would otherwise yield a NaN prediction.
 _Feature = Field(..., allow_inf_nan=False, ge=-FEATURE_BOUND, le=FEATURE_BOUND)
