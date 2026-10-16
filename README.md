@@ -45,6 +45,92 @@ Baseline: simple StandardScaler + LinearRegression. Report RMSE on a held-out sp
 ### Iteration 2 (v0.2)
 Improvement: try Ridge/RandomForestRegressor or better preprocessing (feature scaling/selection), plus calibration of the score if you convert to a “high-risk” flag (e.g., threshold on predicted progression). Show metric deltas (RMSE; if you add a flag, also precision/recall at a threshold) in CHANGELOG.md.
 
+## How to run it.
+
+The images are public on GHCR, so no login is needed:
+
+```bash
+docker pull ghcr.io/tictactoers/maio:v0.1
+docker run -it -p 80:80 ghcr.io/tictactoers/maio:v0.1
+```
+
+Same for v0.2, just change the tag. Both use port 80, so stop the v0.1 container first.
+
+Check that it's up:
+
+```bash
+curl http://localhost:80/health
+# {"status":"ok","model_version":"v0.1"}
+```
+
+Get a prediction (sample payload):
+
+```bash
+curl -X POST http://localhost:80/predict -H "Content-Type: application/json" -d '{"age": 0.02, "sex": -0.044, "bmi": 0.06, "bp": -0.03, "s1": -0.02, "s2": 0.03, "s3": -0.02, "s4": 0.02, "s5": 0.02, "s6": -0.001}'
+# {"prediction":235.94963722176266}
+```
+
+That's the v0.1 value, v0.2 gives a slightly different number.
+
+All 10 features are required. They are on the same scaled range as the sklearn dataset (roughly -0.2 to 0.2). We reject anything outside -0.5 to 0.5, mainly so nobody sends raw values like `"age": 45` by accident and gets a nonsense score back. Extra fields are ignored.
+
+## Errors.
+
+Bad input gives HTTP 422 with a JSON body. For example, the request above without `s6` returns:
+
+```json
+{
+  "error": "Invalid input",
+  "details": [
+    {"field": "s6", "message": "Field required", "type": "missing"}
+  ]
+}
+```
+
+- `error` is always `"Invalid input"` for these.
+- `details` has one entry per problem. `field` is the input that failed (or `body` if the JSON itself is broken), `message` says what is wrong, and `type` is the short code (`missing`, `float_parsing`, `less_than_equal`, `json_invalid`, ...).
+
+If something breaks on our side you get a 500 with `{"error": "Internal error"}`. The details end up in the container logs.
+
+## Running it locally.
+
+You need Python 3.13.7 (same as CI and the Docker image).
+
+```bash
+git clone https://github.com/TicTacToers/MAIO.git
+cd MAIO
+python3.13 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
+
+ruff check . && ruff format --check .
+pytest -q
+python -m ml.train --out-dir artifacts
+uvicorn app.main:app --port 8000
+```
+
+`ml.train` writes `artifacts/model.joblib` and `artifacts/metrics.json`. For v0.1 you should get a test RMSE of 53.8534 and a 5-fold CV RMSE of 55.3946 ± 2.3615. To get the exact code of a release, run `git checkout v0.1` (or `v0.2`) first. The numbers for each version are in CHANGELOG.md.
+
+If MLflow is installed (it is in requirements-dev.txt), the training run is logged there as well. `mlflow ui` shows it under "diabetes-progression". Use `--no-mlflow` to skip it.
+
+Why the results are the same on every machine: seed and split are fixed in `ml/config.py`, all dependencies are pinned, the Docker base image is pinned by digest, one test trains twice and checks that the results match, and CI checks that the model inside the image is the same one CI trained.
+
+To build the image yourself:
+
+```bash
+docker build -t diabetes-triage:local .
+docker run -it -p 80:80 diabetes-triage:local
+```
+
+The model is trained during the build and baked into the image. The container runs as a non-root user and has a healthcheck.
+
+## CI and releases.
+
+- `ci.yml` runs on every push to main and on every PR: lint, tests, a training run (model and metrics are uploaded as an artifact), the Docker build and a smoke test against the running container.
+- `release.yml` runs when a tag like `v0.1` is pushed. It checks that the tag matches `MODEL_VERSION` and that CHANGELOG.md has a section for it, builds and tests the image, pushes it to GHCR and creates a GitHub Release with `metrics.json` attached.
+
+To release a new version, bump `MODEL_VERSION` in `ml/config.py` and add the CHANGELOG section in a PR. After the merge, tag main and push the tag (`git tag v0.2 && git push origin v0.2`). A newly published package starts out private, so switch it to public in the package settings. Published tags are never moved.
+
 ## Measuring image size and speed
 
 The script `scripts/measure.sh` measures two things:
