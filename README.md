@@ -70,7 +70,7 @@ curl -X POST http://localhost:80/predict -H "Content-Type: application/json" -d 
 # {"prediction":235.94963722176266}
 ```
 
-That's the v0.1 value, v0.2 gives a slightly different number.
+That's the v0.1 value. v0.2 returns the same number, because only the high-risk flag changed (see CHANGELOG.md).
 
 All 10 features are required floats on the scaled range of the sklearn diabetes dataset. Each feature column is scaled to unit norm (sum of squares = 1), so every value in the dataset lies within -1 to 1, and in practice within about -0.2 to 0.2. We reject anything outside -1.0 to 1.0 with a 422, mainly so raw values like `"age": 45` aren't accepted by accident. Extra fields are ignored.
 
@@ -109,7 +109,9 @@ python -m ml.train --out-dir artifacts
 uvicorn app.main:app --port 8000
 ```
 
-`ml.train` writes `artifacts/model.joblib` and `artifacts/metrics.json`. For v0.1 you should get a test RMSE of 53.8534 and a 5-fold CV RMSE of 55.3946 ± 2.3615. To get the exact code of a release, run `git checkout v0.1` (or `v0.2`) first. The numbers for each version are in CHANGELOG.md.
+`ml.train` writes `artifacts/model.joblib` and `artifacts/metrics.json`. Both versions use the same model, so you should get a test RMSE of 53.8534 and a 5-fold CV RMSE of 55.3946 ± 2.3615. They differ in the high-risk flag: v0.1 flags at 214.0 (precision 1.0, recall 0.2857), v0.2 at the calibrated cutoff 197.0 (precision 0.8571, recall 0.5714). To get the exact code of a release, run `git checkout v0.1` (or `v0.2`) first. The numbers for each version are in CHANGELOG.md.
+
+The experiments behind the v0.2 changelog can be re-run with `python -m experiments.compare_models` (candidate models by CV RMSE) and `python -m experiments.calibrate_flag` (flag cutoffs). They are not part of the Docker image.
 
 If MLflow is installed (it is in requirements-dev.txt), the training run is logged there as well. `mlflow ui` shows it under "diabetes-progression". Use `--no-mlflow` to skip it.
 
