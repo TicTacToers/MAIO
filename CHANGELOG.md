@@ -8,7 +8,7 @@ CV RMSE is 5-fold cross-validation on the training split only.
 - Model: `StandardScaler` + `LinearRegression`
 - API: `GET /health`, `POST /predict`, with JSON 422 errors on invalid input (features must be within ±1.0)
 - Docker: multi-stage build, model baked in, non-root user, port 80, healthcheck
-- High-risk flagging (only reported metrics.json): a patient is flagged when the predicted progression score is above the 75th percentile of the real progression values for training patients.
+- High-risk flagging (only reported metrics.json): a patient is flagged when the predicted progression score is at or above the 75th percentile of the real progression values for training patients
 | Metric                       | v0.1             |
 |------------------------------|------------------|
 | RMSE (test)                  | 53.8534          |
