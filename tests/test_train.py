@@ -38,3 +38,13 @@ def test_high_risk_metrics_valid(artifacts):
     assert metrics["high_risk_threshold"] > 0
     assert 0 <= metrics["high_risk_precision"] <= 1
     assert 0 <= metrics["high_risk_recall"] <= 1
+
+
+def test_calibrated_flag_metrics_are_valid(artifacts):
+    _, metrics = artifacts
+    keys = ("calibrated_cutoff", "calibrated_precision", "calibrated_recall", "calibrated_f1")
+    for key in keys:
+        assert isinstance(metrics[key], float)
+    assert metrics["calibrated_cutoff"] <= metrics["high_risk_threshold"]
+    for key in keys[1:]:
+        assert 0 <= metrics[key] <= 1
