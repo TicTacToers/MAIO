@@ -34,6 +34,5 @@ def main(ci_path: str, image_path: str) -> int:
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
-        sys.exit(__doc__)
+        sys.exit("usage: python3 scripts/compare_metrics.py <ci-metrics.json> <image-metrics.json>")
     sys.exit(main(sys.argv[1], sys.argv[2]))
-
