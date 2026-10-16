@@ -97,6 +97,13 @@ async def validation_error_handler(_: Request, exc: RequestValidationError) -> J
     )
 
 
+# Without this, an unexpected server error returns plain text "Internal Server Error".
+# The traceback is still logged by uvicorn; the client only gets a generic JSON body.
+@app.exception_handler(Exception)
+async def unhandled_error_handler(_: Request, __: Exception) -> JSONResponse:
+    return JSONResponse(status_code=500, content={"error": "Internal error"})
+
+
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok", "model_version": _state.get("model_version", "unknown")}

@@ -1,5 +1,5 @@
 # ---------- Stage 1: install deps + train the model ----------
-FROM python:3.13.7-slim AS builder
+FROM python:3.13.7-slim@sha256:5f55cdf0c5d9dc1a415637a5ccc4a9e18663ad203673173b8cda8f8dcacef689 AS builder
 
 ENV PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
@@ -17,7 +17,7 @@ COPY ml/ ml/
 RUN python -m ml.train --out-dir /build/artifacts --no-mlflow
 
 # ---------- Stage 2: slim runtime ----------
-FROM python:3.13.7-slim AS runtime
+FROM python:3.13.7-slim@sha256:5f55cdf0c5d9dc1a415637a5ccc4a9e18663ad203673173b8cda8f8dcacef689 AS runtime
 
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \

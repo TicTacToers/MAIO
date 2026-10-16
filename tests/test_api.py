@@ -1,5 +1,9 @@
+import joblib
 import pytest
+from fastapi.testclient import TestClient
+from sklearn.datasets import load_diabetes
 
+from app import main
 from ml.config import FEATURES, MODEL_VERSION
 
 
@@ -61,3 +65,28 @@ def test_out_of_range_feature_returns_422(client, sample, value):
 def test_feature_at_bound_is_accepted(client, sample, value):
     sample["age"] = value
     assert client.post("/predict", json=sample).status_code == 200
+
+
+def test_prediction_matches_model_for_dataset_row(client, artifacts):
+    # Guards the field -> column mapping: if the API ever fed features in a different
+    # order than training, this prediction would no longer match the model's own.
+    out, _ = artifacts
+    pipeline = joblib.load(out / "model.joblib")["pipeline"]
+    data = load_diabetes()
+    row = dict(zip(FEATURES, data.data[0].tolist(), strict=True))
+    r = client.post("/predict", json=row)
+    assert r.status_code == 200
+    assert r.json()["prediction"] == pytest.approx(pipeline.predict(data.data[:1])[0])
+
+
+class _BrokenPipeline:
+    def predict(self, _):
+        raise RuntimeError("simulated model failure")
+
+
+def test_unexpected_error_returns_json_500(client, sample, monkeypatch):
+    monkeypatch.setitem(main._state, "pipeline", _BrokenPipeline())
+    raw = TestClient(main.app, raise_server_exceptions=False)
+    r = raw.post("/predict", json=sample)
+    assert r.status_code == 500
+    assert r.json() == {"error": "Internal error"}
