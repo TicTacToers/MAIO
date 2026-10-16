@@ -11,12 +11,19 @@ import numpy as np
 import sklearn
 from sklearn.datasets import load_diabetes
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, precision_score, recall_score
 from sklearn.model_selection import KFold, cross_val_score, train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-from ml.config import CV_FOLDS, FEATURES, MODEL_VERSION, RANDOM_STATE, TEST_SIZE
+from ml.config import (
+    CV_FOLDS,
+    FEATURES,
+    HIGH_RISK_PERCENTILE,
+    MODEL_VERSION,
+    RANDOM_STATE,
+    TEST_SIZE,
+)
 
 
 def build_pipeline() -> Pipeline:
@@ -64,10 +71,21 @@ def train(out_dir: Path) -> dict:
     preds = pipeline.predict(X_test)
     rmse = float(np.sqrt(mean_squared_error(y_test, preds)))
 
+    # Computations for predictions considered high Risk
+    threshold = float(np.percentile(y_train, HIGH_RISK_PERCENTILE))
+    actual_high = y_test >= threshold
+    predicted_high = preds >= threshold
+    precision = float(precision_score(actual_high, predicted_high, zero_division=0))
+    recall = float(recall_score(actual_high, predicted_high, zero_division=0))
+
     metrics = {
         "model_version": MODEL_VERSION,
         "model": type(pipeline.named_steps["model"]).__name__,
         "rmse": round(rmse, 4),
+        "high_risk_percentile": HIGH_RISK_PERCENTILE,
+        "high_risk_threshold": round(threshold, 4),
+        "high_risk_precision": round(precision, 4),
+        "high_risk_recall": round(recall, 4),
         "cv_rmse_mean": round(float(cv_scores.mean()), 4),
         "cv_rmse_std": round(float(cv_scores.std()), 4),
         "cv_folds": CV_FOLDS,
@@ -102,7 +120,17 @@ def log_to_mlflow(metrics: dict, out_dir: Path) -> bool:
         run_params = ("model_version", "model", "test_size", "random_state", "cv_folds")
         mlflow.log_params({k: metrics[k] for k in run_params} | metrics["hyperparams"])
         mlflow.log_metrics(
-            {k: metrics[k] for k in ("rmse", "cv_rmse_mean", "cv_rmse_std", "train_seconds")}
+            {
+                k: metrics[k]
+                for k in (
+                    "rmse",
+                    "cv_rmse_mean",
+                    "cv_rmse_std",
+                    "high_risk_precision",
+                    "high_risk_recall",
+                    "train_seconds",
+                )
+            }
         )
         mlflow.log_artifact(str(out_dir / "metrics.json"))
         mlflow.log_artifact(str(out_dir / "model.joblib"))
