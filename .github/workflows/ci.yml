@@ -10,11 +10,11 @@ permissions:
 
 jobs:
   lint-test-train:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.13.7"
           cache: pip
@@ -35,7 +35,7 @@ jobs:
         run: python -m ml.train --out-dir artifacts --no-mlflow
 
       - name: Upload model + metrics
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: model-${{ github.sha }}
           path: artifacts/
@@ -43,12 +43,24 @@ jobs:
 
   docker-smoke:
     needs: lint-test-train
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Build image
         run: docker build -t diabetes-triage:ci .
+
+      - name: Download the CI-trained metrics
+        uses: actions/download-artifact@v7
+        with:
+          name: model-${{ github.sha }}
+          path: ci-artifacts
+
+      - name: Image model matches the CI training run
+        run: |
+          docker run --rm --entrypoint cat diabetes-triage:ci /app/artifacts/metrics.json \
+            > image-metrics.json
+          python3 scripts/compare_metrics.py ci-artifacts/metrics.json image-metrics.json
 
       - name: Run container
         run: docker run -d --name app -p 80:80 diabetes-triage:ci

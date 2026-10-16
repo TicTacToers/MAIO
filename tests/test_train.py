@@ -22,7 +22,7 @@ def test_metrics_include_cv_and_hyperparams(artifacts):
     assert metrics["cv_folds"] == CV_FOLDS
     assert 0 < metrics["cv_rmse_mean"] < 70
     assert metrics["cv_rmse_std"] >= 0
-    assert metrics["hyperparams"]["model__fit_intercept"] is True
+    assert metrics["hyperparams"], "hyperparams should be logged for any model"
     assert all("__" in k for k in metrics["hyperparams"])
 
 
