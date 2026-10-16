@@ -72,7 +72,7 @@ curl -X POST http://localhost:80/predict -H "Content-Type: application/json" -d 
 
 That's the v0.1 value, v0.2 gives a slightly different number.
 
-All 10 features are required. They are on the same scaled range as the sklearn dataset (roughly -0.2 to 0.2). We reject anything outside -0.5 to 0.5, mainly so nobody sends raw values like `"age": 45` by accident and gets a nonsense score back. Extra fields are ignored.
+All 10 features are required floats on the scaled range of the sklearn diabetes dataset. Each feature column is scaled to unit norm (sum of squares = 1), so every value in the dataset lies within -1 to 1, and in practice within about -0.2 to 0.2. We reject anything outside -1.0 to 1.0 with a 422, mainly so raw values like `"age": 45` aren't accepted by accident. Extra fields are ignored.
 
 ## Errors.
 

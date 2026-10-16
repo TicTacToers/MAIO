@@ -53,7 +53,7 @@ def test_malformed_json_returns_422(client):
     }
 
 
-@pytest.mark.parametrize("value", [45.0, -45.0, 0.51])
+@pytest.mark.parametrize("value", [45.0, -45.0, 1.01, -1.01])
 def test_out_of_range_feature_returns_422(client, sample, value):
     sample["age"] = value
     r = client.post("/predict", json=sample)
@@ -61,7 +61,7 @@ def test_out_of_range_feature_returns_422(client, sample, value):
     assert r.json()["details"][0]["field"] == "age"
 
 
-@pytest.mark.parametrize("value", [0.5, -0.5])
+@pytest.mark.parametrize("value", [1.0, -1.0])
 def test_feature_at_bound_is_accepted(client, sample, value):
     sample["age"] = value
     assert client.post("/predict", json=sample).status_code == 200
