@@ -67,18 +67,8 @@ jobs:
 
       - name: Smoke test endpoints
         run: |
-          for i in $(seq 1 20); do curl -sf http://localhost:80/health && break; sleep 1; done
-          curl -sf http://localhost:80/health | grep -q '"status":"ok"'
           expected=$(python3 -c 'from ml.config import MODEL_VERSION; print(MODEL_VERSION)')
-          actual=$(curl -sf http://localhost:80/health | jq -r .model_version)
-          echo "model_version: expected=$expected actual=$actual"
-          test "$actual" = "$expected"
-          curl -sf -X POST http://localhost:80/predict -H "Content-Type: application/json" \
-            -d '{"age":0.02,"sex":-0.044,"bmi":0.06,"bp":-0.03,"s1":-0.02,"s2":0.03,"s3":-0.02,"s4":0.02,"s5":0.02,"s6":-0.001}' \
-            | grep -q '"prediction"'
-          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:80/predict \
-            -H "Content-Type: application/json" -d '{"age":0.02}')
-          test "$code" = "422"
+          bash scripts/smoke.sh "$expected"
           docker image ls diabetes-triage:ci --format 'Image size: {{.Size}}'
 
       - name: Container logs on failure
