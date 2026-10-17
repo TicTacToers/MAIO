@@ -11,12 +11,13 @@ import numpy as np
 import sklearn
 from sklearn.datasets import load_diabetes
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error, precision_score, recall_score
-from sklearn.model_selection import KFold, cross_val_score, train_test_split
+from sklearn.metrics import f1_score, mean_squared_error, precision_score, recall_score
+from sklearn.model_selection import KFold, cross_val_predict, cross_val_score, train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
 from ml.config import (
+    CUTOFF_STEP,
     CV_FOLDS,
     FEATURES,
     HIGH_RISK_PERCENTILE,
@@ -48,6 +49,29 @@ def cv_rmse(X: np.ndarray, y: np.ndarray) -> np.ndarray:
     return -cross_val_score(build_pipeline(), X, y, cv=cv, scoring="neg_root_mean_squared_error")
 
 
+def flag_scores(
+    preds: np.ndarray, actual_high: np.ndarray, cutoff: float
+) -> tuple[float, float, float]:
+    flag = preds >= cutoff
+    return (
+        float(precision_score(actual_high, flag, zero_division=0)),
+        float(recall_score(actual_high, flag, zero_division=0)),
+        float(f1_score(actual_high, flag, zero_division=0)),
+    )
+
+
+def calibrate_cutoff(X: np.ndarray, y: np.ndarray, truth_cut: float) -> float:
+    cv = KFold(n_splits=CV_FOLDS, shuffle=True, random_state=RANDOM_STATE)
+    oof = cross_val_predict(build_pipeline(), X, y, cv=cv)  # All validation folds
+    actual_high = y >= truth_cut
+    grid = np.append(
+        np.arange(np.floor(oof.min()), truth_cut, CUTOFF_STEP), truth_cut
+    )  # Try all cutoffs from lowest prediction to the high-risk threshold
+    return float(
+        max(grid, key=lambda c: flag_scores(oof, actual_high, c)[2])
+    )  # Get the cutoff with the best F1
+
+
 def load_data() -> tuple[np.ndarray, np.ndarray]:
     data = load_diabetes()
     if list(data.feature_names) != FEATURES:
@@ -74,9 +98,11 @@ def train(out_dir: Path) -> dict:
     # Computations for predictions considered high Risk
     threshold = float(np.percentile(y_train, HIGH_RISK_PERCENTILE))
     actual_high = y_test >= threshold
-    predicted_high = preds >= threshold
-    precision = float(precision_score(actual_high, predicted_high, zero_division=0))
-    recall = float(recall_score(actual_high, predicted_high, zero_division=0))
+    precision, recall, f1 = flag_scores(preds, actual_high, threshold)
+    cutoff = calibrate_cutoff(
+        X_train, y_train, threshold
+    )  # Cutoff after calibration is the one maximizing F1 on the training split
+    cal_precision, cal_recall, cal_f1 = flag_scores(preds, actual_high, cutoff)
 
     metrics = {
         "model_version": MODEL_VERSION,
@@ -86,6 +112,11 @@ def train(out_dir: Path) -> dict:
         "high_risk_threshold": round(threshold, 4),
         "high_risk_precision": round(precision, 4),
         "high_risk_recall": round(recall, 4),
+        "high_risk_f1": round(f1, 4),
+        "calibrated_cutoff": round(cutoff, 4),
+        "calibrated_precision": round(cal_precision, 4),
+        "calibrated_recall": round(cal_recall, 4),
+        "calibrated_f1": round(cal_f1, 4),
         "cv_rmse_mean": round(float(cv_scores.mean()), 4),
         "cv_rmse_std": round(float(cv_scores.std()), 4),
         "cv_folds": CV_FOLDS,
@@ -128,6 +159,9 @@ def log_to_mlflow(metrics: dict, out_dir: Path) -> bool:
                     "cv_rmse_std",
                     "high_risk_precision",
                     "high_risk_recall",
+                    "calibrated_precision",
+                    "calibrated_recall",
+                    "calibrated_f1",
                     "train_seconds",
                 )
             }
