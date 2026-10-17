@@ -22,7 +22,7 @@ CV RMSE is 5-fold cross-validation on the training split only.
 ## [v0.2] - Calibrated high-risk flag
 
 ### What changed
-- Model and preprocessing are unchanged (`StandardScaler` + `LinearRegression`). Five alternatives were compared by 5-fold cross-validated RMSE on the training split and none beat the baseline (table below).
+- Model and preprocessing are unchanged (`StandardScaler` + `LinearRegression`). Five alternatives were compared by 5-fold cross-validated RMSE on the training split and none clearly beat the baseline: the best one (Ridge) is 0.02 lower, far below the spread between folds of about 2.4 (table below).
 - The high-risk flag now uses a calibrated cutoff: the cutoff with the best F1 on out-of-fold predictions of the training split, searched from the lowest prediction up to the v0.1 cutoff in steps of 1. It is 197.0, instead of the 214.0 that also defines "truly high risk". The test split is used once, for reporting.
 - `metrics.json` has new fields: `high_risk_f1`, `calibrated_cutoff`, `calibrated_precision`, `calibrated_recall`, `calibrated_f1`.
 - `/predict` is unchanged. The flag is reported in the metrics only.
@@ -42,9 +42,7 @@ CV RMSE is 5-fold cross-validation on the training split only.
 | Image size                   | 612.7 MB         | 612.7 MB         | 0        |
 | p50 /predict latency         | 2.17 ms          | 2.21 ms          | +0.04 ms |
 
-*Image size and latency were measured with scripts/measure.sh using v0.1 and v0.2 and both built locally on the same machine (. Results depend on the machine.
-
-Image size and latency were measure using scripts/measure.sh, with v0.1 and v0.2 both built locally on the same machine (MacBook Air M4). Results depend on the machine.
+*Image size and latency were measured using scripts/measure.sh, with v0.1 and v0.2 both built locally on the same machine (MacBook Air M4). Results depend on the machine.
 
 ### Candidate models (CV RMSE on the training split, mean ± std)
 
