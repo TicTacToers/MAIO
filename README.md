@@ -70,7 +70,15 @@ curl -X POST http://localhost:80/predict -H "Content-Type: application/json" -d 
 # {"prediction":235.94963722176266}
 ```
 
-That's the v0.1 value. v0.2 returns the same number, because only the high-risk flag changed (see CHANGELOG.md).
+That's the v0.1 value (the last digits can differ slightly between machines). v0.2 returns the same number, because only the high-risk flag changed (see CHANGELOG.md).
+
+On Windows, use PowerShell and write `curl.exe` instead of `curl`. Also change the quotes inside JSON:
+
+```powershell
+curl.exe http://localhost:80/health
+
+'{"age": 0.02, "sex": -0.044, "bmi": 0.06, "bp": -0.03, "s1": -0.02, "s2": 0.03, "s3": -0.02, "s4": 0.02, "s5": 0.02, "s6": -0.001}' | curl.exe -X POST http://localhost:80/predict -H "Content-Type: application/json" -d "@-"
+```
 
 All 10 features are required floats on the scaled range of the sklearn diabetes dataset. Each feature column is scaled to unit norm (sum of squares = 1), so every value in the dataset lies within -1 to 1, and in practice within about -0.2 to 0.2. We reject anything outside -1.0 to 1.0 with a 422, mainly so raw values like `"age": 45` aren't accepted by accident. Extra fields are ignored.
 
@@ -94,16 +102,35 @@ If something breaks on our side you get a 500 with `{"error": "Internal error"}`
 
 ## Running it locally.
 
-You need Python 3.13.7 (same as CI and the Docker image).
+You need Python 3.13 (CI and the Docker image use 3.13.7).
+On Windows, the `py` launcher picks the right version if you have several installed.
 
 ```bash
 git clone https://github.com/TicTacToers/MAIO.git
 cd MAIO
+```
+
+Create and activate a virtual environment. On Mac and Linux:
+
+```bash
 python3.13 -m venv .venv
 source .venv/bin/activate
+```
+
+On Windows (PowerShell):
+
+```powershell
+py -3.13 -m venv .venv
+.venv\Scripts\Activate.ps1
+```
+
+If PowerShell refuses to run the script, run `Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned` first. It only applies to the current window. From here the commands are the same everywhere:
+
+```bash
 pip install -r requirements-dev.txt
 
-ruff check . && ruff format --check .
+ruff check .
+ruff format --check .
 pytest -q
 python -m ml.train --out-dir artifacts
 uvicorn app.main:app --port 8000
@@ -115,7 +142,7 @@ The experiments behind the v0.2 changelog can be re-run with `python -m experime
 
 If MLflow is installed (it is in requirements-dev.txt), the training run is logged there as well. `mlflow ui` shows it under "diabetes-progression". Use `--no-mlflow` to skip it.
 
-Why the results are the same on every machine: seed and split are fixed in `ml/config.py`, all dependencies are pinned, the Docker base image is pinned by digest, one test trains twice and checks that the results match, and CI checks that the model inside the image is the same one CI trained.
+Why the metrics are the same on every machine (even if the last digits of the prediction can differ between OS): seed and split are fixed in `ml/config.py`, all dependencies are pinned, the Docker base image is pinned by digest, one test trains twice and checks that the results match, and CI checks that the model inside the image is the same one CI trained.
 
 To build the image yourself:
 
@@ -131,7 +158,7 @@ The model is trained during the build and baked into the image. The container ru
 - `ci.yml` runs on every push to main and on every PR: lint, tests, a training run (model and metrics are uploaded as an artifact), the Docker build and a smoke test against the running container.
 - `release.yml` runs when a tag like `v0.1` is pushed. It checks that the tag matches `MODEL_VERSION` and that CHANGELOG.md has a section for it, builds and tests the image, pushes it to GHCR and creates a GitHub Release with `metrics.json` attached.
 
-To release a new version, bump `MODEL_VERSION` in `ml/config.py` and add the CHANGELOG section in a PR. After the merge, tag main and push the tag (`git tag v0.2 && git push origin v0.2`). A newly published package starts out private, so switch it to public in the package settings. Published tags are never moved.
+To release a new version, bump `MODEL_VERSION` in `ml/config.py` and add the CHANGELOG section in a PR. After the merge, tag main (`git tag v0.2`) and push the tag (`git push origin v0.2`). A newly published package starts out private, so switch it to public in the package settings. Published tags are never moved.
 
 ## Measuring image size and speed
 
@@ -154,4 +181,6 @@ The script starts the container, sends 20 practice requests, and then times 200 
 
 It uses port 8000, so it can run while another container uses port 80.
 Results depend on the machine. Keep in mind for comparability.
-You need Docker, `curl` and `bash` (Mac or Linux).
+You need Docker, `curl` and `bash` (Mac, Linux).
+On Windows, run the script from Git Bash with Docker Desktop running.
+
