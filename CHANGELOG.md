@@ -43,7 +43,7 @@ CV RMSE is 5-fold cross-validation on the training split only.
 | Image size (unpacked)        | 480.9 MB         | 403.4 MB         | -77.5 MB |
 | p50 /predict latency         | 2.15 ms          | 2.10 ms          | -0.05 ms |
 
-Image size and latency were measured with `scripts/measure.sh` (`N=1000`), with v0.1 (from its tag) and v0.2 both built locally on the same machine (MacBook Air M4). Image size is the unpacked size, the sum of the image layers. Latency depends on the machine and varies by about 0.5 ms between runs, so the two versions are equally fast.
+Image size and latency were measured with `scripts/measure.sh` (`N=1000`), with v0.1 (from its tag) and v0.2 both built locally on the same machine (MacBook M4 Pro). Image size is the unpacked size, the sum of the image layers. Latency depends on the machine and varies by about 0.5 ms between runs.
 
 ### Candidate models (CV RMSE on the training split, mean ± std)
 
