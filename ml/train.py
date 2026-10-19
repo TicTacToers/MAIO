@@ -1,3 +1,5 @@
+"""Train the progression model and write artifacts/model.joblib and artifacts/metrics.json."""
+
 from __future__ import annotations
 
 import argparse
@@ -159,6 +161,7 @@ def log_to_mlflow(metrics: dict, out_dir: Path) -> bool:
                     "cv_rmse_std",
                     "high_risk_precision",
                     "high_risk_recall",
+                    "high_risk_f1",
                     "calibrated_precision",
                     "calibrated_recall",
                     "calibrated_f1",
