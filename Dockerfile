@@ -16,6 +16,10 @@ COPY ml/ ml/
 # The model is trained at build time and embedded into the image.
 RUN python -m ml.train --out-dir /build/artifacts --no-mlflow
 
+# Not needed at runtime: the libraries' bundled test suites and pip itself.
+RUN find /opt/venv -depth -type d -name tests -exec rm -rf {} + \
+    && python -m pip uninstall -y pip
+
 # ---------- Stage 2: slim runtime ----------
 FROM python:3.13.7-slim@sha256:5f55cdf0c5d9dc1a415637a5ccc4a9e18663ad203673173b8cda8f8dcacef689 AS runtime
 
