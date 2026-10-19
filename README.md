@@ -13,7 +13,8 @@ The model is trained on the open scikit-learn diabetes dataset (`load_diabetes`)
 | Version | Model                                 | Change                                        |
 |---------|---------------------------------------|-----------------------------------------------|
 | v0.1    | `StandardScaler` + `LinearRegression` | Baseline API and Docker image                 |
-| v0.2    | Same model                            | Calibrated high-risk flag cutoff (in metrics) |
+| v0.2    | Same model                            | Calibrated high-risk flag cutoff (in metrics), smaller image |
+> For v0.2, Ridge, RidgeCV, LassoCV, RandomForest and GradientBoosting were compared with the baseline by 5-fold cross-validated RMSE on the training split. None was meaningfully better (the best, Ridge, was 0.02 lower against a spread of about 2.4 between folds), so the baseline model was kept.
 
 What changed and why, with metrics for both versions, is in [CHANGELOG.md](CHANGELOG.md).
 
@@ -153,3 +154,6 @@ Results depend on the machine. Keep in mind for comparability.
 You need Docker, `curl` and `bash` (Mac, Linux).
 On Windows, run the script from Git Bash with Docker Desktop running.
 
+## AI disclosure
+
+We used AI assistants (Claude) during this project, mainly to help format the documentation (README.md, CHANGELOG.md) and to write tests. All AI-assisted changes were reviewed by the team and went through the same PR review and CI checks as the rest of the code.
