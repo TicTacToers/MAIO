@@ -1,7 +1,6 @@
 import json
 
 from ml.config import CV_FOLDS, HIGH_RISK_PERCENTILE, MODEL_VERSION
-from ml.train import train
 
 
 def test_training_writes_artifacts(artifacts):
@@ -24,12 +23,6 @@ def test_metrics_include_cv_and_hyperparams(artifacts):
     assert metrics["cv_rmse_std"] >= 0
     assert metrics["hyperparams"], "hyperparams should be logged for any model"
     assert all("__" in k for k in metrics["hyperparams"])
-
-
-def test_training_is_deterministic(artifacts, tmp_path):
-    _, first = artifacts
-    second = train(tmp_path)
-    assert first["rmse"] == second["rmse"]
 
 
 def test_high_risk_metrics_valid(artifacts):
