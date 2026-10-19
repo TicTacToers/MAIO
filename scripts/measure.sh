@@ -29,9 +29,10 @@ elif ! docker image inspect "$IMAGE" > /dev/null 2>&1; then
   docker pull -q "$IMAGE" > /dev/null
 fi
 
-# 1. Image size
-bytes=$(docker image inspect "$IMAGE" --format '{{.Size}}')
-size_mb=$(awk -v b="$bytes" 'BEGIN { printf "%.1f", b / 1000000 }')
+# 1. Image size: unpacked, as the sum of the layer sizes. `docker image inspect` is not used,
+# because with the containerd image store it reports the compressed size instead.
+size_mb=$(docker history "$IMAGE" --human=false --format '{{.Size}}' \
+  | awk '{ b += $1 } END { printf "%.1f", b / 1000000 }')
 
 # Start the container and always remove it again, even if the script fails.
 docker rm -f "$NAME" > /dev/null 2>&1 || true
