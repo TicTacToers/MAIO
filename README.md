@@ -1,52 +1,23 @@
 # MAIO - Virtual Diabetes Clinic Triage
 Case assignment VT2026 Stockholm University, for course MAIO Group G.
 
-## Context. 
-A hospital runs a virtual diabetes clinic. Each week, nurses review hundreds of patient check-ins (vitals, labs, lifestyle notes) to decide who needs a follow-up call. Reviews are manual and time-consuming.
+## What it is
 
-## Goal. 
-Build a small ML service that predicts short-term disease progression and returns a continuous risk score. The clinic will use the score to prioritize follow-ups. Everything should be built in a pipeline using GitHub Actions (https://docs.github.com/en/actions). More info on the ML service below in Users & Flow.
+A hospital runs a virtual diabetes clinic where nurses review hundreds of patient check-ins each week to decide who needs a follow-up call. This service predicts short-term disease progression as a continuous risk score, so the triage dashboard can sort patients by score (highest first) and call them in that order.
 
-## Data. 
-For the assignment, use the open scikit-learn Diabetes regression dataset as a stand-in for de-identified EHR features:
+- `POST /predict` takes the 10 patient features and returns `{"prediction": <float>}`. Higher means more expected progression.
+- `GET /health` returns `{"status": "ok", "model_version": "..."}` for monitoring.
 
-```python
-from sklearn.datasets import load_diabetes
+The model is trained on the open scikit-learn diabetes dataset (`load_diabetes`) as a stand-in for de-identified EHR data. The target is used as the progression index. Training, testing, the Docker build and releases all run in GitHub Actions.
 
-Xy = load_diabetes(as_frame=True)
+| Version | Model                                 | Change                                        |
+|---------|---------------------------------------|-----------------------------------------------|
+| v0.1    | `StandardScaler` + `LinearRegression` | Baseline API and Docker image                 |
+| v0.2    | Same model                            | Calibrated high-risk flag cutoff (in metrics) |
 
-X = Xy.frame.drop(columns=["target"])
+What changed and why, with metrics for both versions, is in [CHANGELOG.md](CHANGELOG.md).
 
-y = Xy.frame["target"]  # acts as a "progression index" (higher = worse)
-```
-> Treat `y` as a progression index: higher values ≈ greater deterioration risk (e.g., rising HbA1c/complications risk). In production, a clinic would train on real outcomes; here, we map the same mechanics to a safe, open dataset.
-
-## Users & flow.
-
-- Triage Nurse opens a dashboard sorted by predicted progression (descending).
-
-- ML Service hosts /predict that the dashboard calls for each patient and /health for internal monitoring.
-
-- MLOps Team (you) owns training, packaging, testing, and releasing the service.
-
-## Non-functional constraints.
-
-Portability: Docker image must be self-contained.
-Observability: Return JSON errors on bad input.
-
-## Reproducibility: 
-Same code + GitHub Actions should retrain and rebuild deterministically.
-
-## Iteration plan.
-
-### Iteration 1 (v0.1)
-Baseline: simple StandardScaler + LinearRegression. Report RMSE on a held-out split. Ship a working API & Docker image.
-
-### Iteration 2 (v0.2)
-Improvement: try Ridge/RandomForestRegressor or better preprocessing (feature scaling/selection), plus calibration of the score if you convert to a “high-risk” flag (e.g., threshold on predicted progression). Show metric deltas (RMSE; if you add a flag, also precision/recall at a threshold) in CHANGELOG.md.
-
-## How to run it.
-
+## How to run it
 The images are public on GHCR, so no login is needed:
 
 ```bash
@@ -60,7 +31,7 @@ Check that it's up:
 
 ```bash
 curl http://localhost:80/health
-# {"status":"ok","model_version":"v0.1"}
+# {"status":"ok","model_version":"v0.1"}   (v0.2 reports "v0.2")
 ```
 
 Get a prediction (sample payload):
@@ -82,8 +53,7 @@ curl.exe http://localhost:80/health
 
 All 10 features are required floats on the scaled range of the sklearn diabetes dataset. Each feature column is scaled to unit norm (sum of squares = 1), so every value in the dataset lies within -1 to 1, and in practice within about -0.2 to 0.2. We reject anything outside -1.0 to 1.0 with a 422, mainly so raw values like `"age": 45` aren't accepted by accident. Extra fields are ignored.
 
-## Errors.
-
+## Errors
 Bad input gives HTTP 422 with a JSON body. For example, the request above without `s6` returns:
 
 ```json
@@ -100,8 +70,7 @@ Bad input gives HTTP 422 with a JSON body. For example, the request above withou
 
 If something breaks on our side you get a 500 with `{"error": "Internal error"}`. The details end up in the container logs.
 
-## Running it locally.
-
+## Running it locally
 You need Python 3.13 (CI and the Docker image use 3.13.7).
 On Windows, the `py` launcher picks the right version if you have several installed.
 
@@ -153,10 +122,10 @@ docker run -it -p 80:80 diabetes-triage:local
 
 The model is trained during the build and baked into the image. The container runs as a non-root user and has a healthcheck.
 
-## CI and releases.
-
+## CI and releases
 - `ci.yml` runs on every push to main and on every PR: lint, tests, a training run (model and metrics are uploaded as an artifact), the Docker build and a smoke test against the running container.
 - `release.yml` runs when a tag like `v0.1` is pushed. It checks that the tag matches `MODEL_VERSION` and that CHANGELOG.md has a section for it, builds and tests the image, pushes it to GHCR and creates a GitHub Release with `metrics.json` attached.
+- `release.yml` can also be started by hand from the Actions tab ("Run workflow"). That is a dry run: the same checks, build and smoke test, but nothing is pushed or released.
 
 To release a new version, bump `MODEL_VERSION` in `ml/config.py` and add the CHANGELOG section in a PR. After the merge, tag main (`git tag v0.2`) and push the tag (`git push origin v0.2`). A newly published package starts out private, so switch it to public in the package settings. Published tags are never moved.
 
